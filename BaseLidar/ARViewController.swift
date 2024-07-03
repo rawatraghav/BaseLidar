@@ -16,6 +16,11 @@ class ARViewController: UIViewController, ARSessionDelegate {
     var frameCounter: Int = 0
     var threatDistances: [Float32] = []
     
+    var fixedThreshold: Float32?
+    var thresholdFrameCounter: Int = 0
+    let frameWindow = 80 // Number of frames for which the threshold should be fixed
+    var previousClosePointsCount: Int?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -32,7 +37,7 @@ class ARViewController: UIViewController, ARSessionDelegate {
         
         setupUI()
         setupGridOverlay()
-            }
+    }
     
     func setupUI() {
         startStopButton = UIButton(type: .system)
@@ -116,9 +121,27 @@ class ARViewController: UIViewController, ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         frameCounter += 1
         
-        if frameCounter % 10 == 0, let sceneDepth = frame.sceneDepth {
+        if let sceneDepth = frame.sceneDepth {
             let depthData = sceneDepth.depthMap
             processMiddleDepthData(depthData)
+            
+            if frameCounter % 10 == 0 {
+                let currentClosePointsCount = calculateClosePointsCount(depthData)
+                
+                if let previousCount = previousClosePointsCount {
+                    let difference = currentClosePointsCount - previousCount
+                    differenceLabel.text = "Difference: \(difference)"
+                    
+                    // Change the color of the difference label based on the threshold
+//                    if difference < -1.5 {
+//                        differenceLabel.textColor = .red
+//                    } else {
+//                        differenceLabel.textColor = .white
+//                    }
+                }
+                
+                previousClosePointsCount = currentClosePointsCount
+            }
         }
     }
     
@@ -153,38 +176,58 @@ class ARViewController: UIViewController, ARSessionDelegate {
 
         CVPixelBufferUnlockBaseAddress(depthData, .readOnly)
         
-        // Calculate the lowest quartile (25th percentile) value
+        // Sort the depth values to calculate the quartile
         depthValues.sort()
-        let quartileIndex = depthValues.count / 4
-        let d = depthValues[quartileIndex]
         
-        // Calculate the threshold distance
-        let threshold = d + min(0.5, 0.1 * d)
-        
-        // Find all points within the threshold distance
-        let closePoints = depthValues.filter { $0 <= threshold }
-        
-        // Calculate the average of the close points
-        let threatDistance = closePoints.reduce(0, +) / Float32(closePoints.count)
-        
-        // Add the threat distance to the array and calculate the difference
-        if threatDistances.count >= 10 {
-            let previousThreatDistance = threatDistances.removeFirst()
-            let difference = threatDistance - previousThreatDistance
-            differenceLabel.text = "Difference: \(difference)"
-            
-            // Change the color of the difference label based on the threshold
-            if difference < -1.5 {
-                differenceLabel.textColor = .red
-            } else {
-                differenceLabel.textColor = .white
-            }
+        // Update the threshold 'd' every 'frameWindow' frames
+        if thresholdFrameCounter % frameWindow == 0 {
+            let quartileIndex = depthValues.count / 4
+            let d = depthValues[quartileIndex]
+            fixedThreshold = d + min(0.5, 0.1 * d)
         }
         
-        threatDistances.append(threatDistance)
+        thresholdFrameCounter += 1
+    }
+
+    func calculateClosePointsCount(_ depthData: CVPixelBuffer) -> Int {
+        CVPixelBufferLockBaseAddress(depthData, .readOnly)
         
-        // Update the UI labels
-        previousAverageLabel.text = "Previous Average: \(threatDistances.count > 1 ? threatDistances[threatDistances.count - 2] : threatDistance)"
-        currentAverageLabel.text = "Current Average: \(threatDistance)"
+        let width = CVPixelBufferGetWidth(depthData)
+        let height = CVPixelBufferGetHeight(depthData)
+        
+        // Get the base address of the depth data
+        guard let baseAddress = CVPixelBufferGetBaseAddress(depthData) else {
+            return 0
+        }
+        
+        let floatBuffer = unsafeBitCast(baseAddress, to: UnsafeMutablePointer<Float32>.self)
+        
+        // Calculate bounds for the middle part (assuming a 3x3 grid)
+        let startX = width / 3
+        let endX = 2 * (width / 3)
+        let startY = height / 3
+        let endY = 2 * (height / 3)
+        
+        var depthValues: [Float32] = []
+        
+        // Iterate through the depth data to extract the middle part
+        for y in startY..<endY {
+            for x in startX..<endX {
+                let depth = floatBuffer[y * width + x]
+                depthValues.append(depth)
+            }
+        }
+
+        CVPixelBufferUnlockBaseAddress(depthData, .readOnly)
+        
+        // Ensure 'fixedThreshold' is not nil before proceeding
+        guard let threshold = fixedThreshold else {
+            return 0
+        }
+        
+        // Find all points within the threshold distance
+        let closePointsCount = depthValues.filter { $0 <= threshold }.count
+        
+        return closePointsCount
     }
 }
