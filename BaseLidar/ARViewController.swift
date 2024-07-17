@@ -9,12 +9,15 @@ class ARViewController: UIViewController, ARSessionDelegate {
     var currentAverageLabel: UILabel!
     var previousAverageLabel: UILabel!
     var differenceLabel: UILabel!
+    var directionLabel: UILabel!
     var isARSessionRunning: Bool = false
     var gridOverlayView: UIView!
     
     var middleSums: [Float32] = []
     var frameCounter: Int = 0
     var threatDistances: [Float32] = []
+    var coords: [CGPoint] = []
+//    var currentCoord: CGPoint?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -32,7 +35,7 @@ class ARViewController: UIViewController, ARSessionDelegate {
         
         setupUI()
         setupGridOverlay()
-            }
+    }
     
     func setupUI() {
         startStopButton = UIButton(type: .system)
@@ -51,26 +54,29 @@ class ARViewController: UIViewController, ARSessionDelegate {
         statusLabel.text = "AR Session Paused"
         view.addSubview(statusLabel)
         
-        // Set up the current average label
         currentAverageLabel = UILabel(frame: CGRect(x: 20, y: 80, width: view.frame.width - 40, height: 40))
         currentAverageLabel.textAlignment = .center
         currentAverageLabel.textColor = .white
-        currentAverageLabel.text = "Current Average: N/A"
+        currentAverageLabel.text = "Current Coordinates: N/A"
         view.addSubview(currentAverageLabel)
         
-        // Set up the previous average label
         previousAverageLabel = UILabel(frame: CGRect(x: 20, y: 120, width: view.frame.width - 40, height: 40))
         previousAverageLabel.textAlignment = .center
         previousAverageLabel.textColor = .white
-        previousAverageLabel.text = "Previous Average: N/A"
+        previousAverageLabel.text = "Previous Coordinates: N/A"
         view.addSubview(previousAverageLabel)
         
-        // Set up the difference label
         differenceLabel = UILabel(frame: CGRect(x: 20, y: 160, width: view.frame.width - 40, height: 40))
         differenceLabel.textAlignment = .center
         differenceLabel.textColor = .white
         differenceLabel.text = "Difference: N/A"
         view.addSubview(differenceLabel)
+        
+        directionLabel = UILabel(frame: CGRect(x: 20, y: 200, width: view.frame.width - 40, height: 40))
+        directionLabel.textAlignment = .center
+        directionLabel.textColor = .white
+        directionLabel.text = "Direction: N/A"
+        view.addSubview(directionLabel)
     }
     
     func setupGridOverlay() {
@@ -112,7 +118,6 @@ class ARViewController: UIViewController, ARSessionDelegate {
         sceneView.session.run(configuration)
     }
     
-    // ARSessionDelegate method to handle new AR frames
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         frameCounter += 1
         
@@ -128,63 +133,83 @@ class ARViewController: UIViewController, ARSessionDelegate {
         let width = CVPixelBufferGetWidth(depthData)
         let height = CVPixelBufferGetHeight(depthData)
         
-        // Get the base address of the depth data
         guard let baseAddress = CVPixelBufferGetBaseAddress(depthData) else {
             return
         }
         
         let floatBuffer = unsafeBitCast(baseAddress, to: UnsafeMutablePointer<Float32>.self)
         
-        // Calculate bounds for the middle part (assuming a 3x3 grid)
         let startX = width / 3
         let endX = 2 * (width / 3)
         let startY = height / 3
         let endY = 2 * (height / 3)
         
         var depthValues: [Float32] = []
+        var coordinates: [CGPoint] = []
         
-        // Iterate through the depth data to extract the middle part
+        var depthWithCoordinates: [(depth: Float, coordinate: CGPoint)] = []
+        
         for y in startY..<endY {
             for x in startX..<endX {
                 let depth = floatBuffer[y * width + x]
-                depthValues.append(depth)
+//                depthValues.append(depth)
+//                coordinates.append(CGPoint(x: x, y: y))
+                depthWithCoordinates.append((depth: depth, coordinate: CGPoint(x: x, y: y)))
             }
         }
 
         CVPixelBufferUnlockBaseAddress(depthData, .readOnly)
         
-        // Calculate the lowest quartile (25th percentile) value
-        depthValues.sort()
-        let quartileIndex = depthValues.count / 4
-        let d = depthValues[quartileIndex]
+//        depthValues.sort()
+//        let quartileIndex = depthValues.count / 4
+//        let d = depthValues[quartileIndex]
         
-        // Calculate the threshold distance
+        depthWithCoordinates.sort { $0.depth < $1.depth }
+        let quartileIndex = depthWithCoordinates.count / 4
+        let d = depthWithCoordinates[quartileIndex].depth
+        let coordinateOfD = depthWithCoordinates[quartileIndex].coordinate
+        
         let threshold = d + min(0.5, 0.1 * d)
         
-        // Find all points within the threshold distance
-        let closePoints = depthValues.filter { $0 <= threshold }
+        var closePoints: [(depth: Float32, coord: CGPoint)] = []
         
-        // Calculate the average of the close points
-        let threatDistance = closePoints.reduce(0, +) / Float32(closePoints.count)
+        for (index, depth) in depthValues.enumerated() {
+            if depth <= threshold {
+                closePoints.append((depth, coordinates[index]))
+                
+            }
+        }
+//        print(closePoints.count)
         
-        // Add the threat distance to the array and calculate the difference
+        let threatDistance = closePoints.map { $0.depth }.reduce(0, +) / Float32(closePoints.count)
+//        
+//        var maxDepth = Float32.leastNormalMagnitude
+//        var currentCoord = CGPoint.zero
+//        for (depth, coord) in closePoints {
+//            if depth < maxDepth {
+//                maxDepth = depth
+//                currentCoord = coord
+//            }
+//        }
+        var currentCoord = CGPoint.zero
+        currentCoord = coordinateOfD
+        
+        
         if threatDistances.count >= 10 {
             let previousThreatDistance = threatDistances.removeFirst()
             let difference = threatDistance - previousThreatDistance
             differenceLabel.text = "Difference: \(difference)"
             
-            // Change the color of the difference label based on the threshold
-            if difference < -1.5 {
-                differenceLabel.textColor = .red
-            } else {
-                differenceLabel.textColor = .white
-            }
+//            if let previousCoord = previousCoord, let currentCoord = closePoints.first?.coord {
+            let previousCoord = coords.removeFirst()
+            let direction = currentCoord.x - previousCoord.x
+            directionLabel.text = direction < 0 ? "Left" : "Right"
+            previousAverageLabel.text = "Previous Coordinates: \(previousCoord)"
+            currentAverageLabel.text = "Current Coordinates: \(currentCoord)"
+//            }
         }
         
         threatDistances.append(threatDistance)
-        
-        // Update the UI labels
-        previousAverageLabel.text = "Previous Average: \(threatDistances.count > 1 ? threatDistances[threatDistances.count - 2] : threatDistance)"
-        currentAverageLabel.text = "Current Average: \(threatDistance)"
+        coords.append(currentCoord)
     }
 }
