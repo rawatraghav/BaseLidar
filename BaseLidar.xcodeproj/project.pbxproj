@@ -17,6 +17,7 @@
 		BEF95D3E2C10EFCD00B1BC5B /* ARKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BEF95D3D2C10EFCD00B1BC5B /* ARKit.framework */; };
 		BEF95D422C10F4BB00B1BC5B /* ARViewControllerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF95D412C10F4BB00B1BC5B /* ARViewControllerRepresentable.swift */; };
 		BEF95D442C10F4DB00B1BC5B /* ARViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF95D432C10F4DB00B1BC5B /* ARViewController.swift */; };
+		BEFA6E132D5E320B00474AFD /* alert.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = BEFA6E122D5E320B00474AFD /* alert.mp3 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +51,7 @@
 		BEF95D3D2C10EFCD00B1BC5B /* ARKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ARKit.framework; path = System/Library/Frameworks/ARKit.framework; sourceTree = SDKROOT; };
 		BEF95D412C10F4BB00B1BC5B /* ARViewControllerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewControllerRepresentable.swift; sourceTree = "<group>"; };
 		BEF95D432C10F4DB00B1BC5B /* ARViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewController.swift; sourceTree = "<group>"; };
+		BEFA6E122D5E320B00474AFD /* alert.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = alert.mp3; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +110,7 @@
 				BEF95D182C10EF8700B1BC5B /* Preview Content */,
 				BEF95D412C10F4BB00B1BC5B /* ARViewControllerRepresentable.swift */,
 				BEF95D432C10F4DB00B1BC5B /* ARViewController.swift */,
+				BEFA6E122D5E320B00474AFD /* alert.mp3 */,
 			);
 			path = BaseLidar;
 			sourceTree = "<group>";
@@ -251,6 +254,7 @@
 			files = (
 				BEF95D1A2C10EF8700B1BC5B /* Preview Assets.xcassets in Resources */,
 				BEF95D172C10EF8700B1BC5B /* Assets.xcassets in Resources */,
+				BEFA6E132D5E320B00474AFD /* alert.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -442,7 +446,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BaseLidar/Preview Content\"";
-				DEVELOPMENT_TEAM = 7FZ36PJ7VU;
+				DEVELOPMENT_TEAM = A2ZW2P5UUP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lidar Usage";
@@ -472,7 +476,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BaseLidar/Preview Content\"";
-				DEVELOPMENT_TEAM = 7FZ36PJ7VU;
+				DEVELOPMENT_TEAM = A2ZW2P5UUP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lidar Usage";

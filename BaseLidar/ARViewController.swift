@@ -9,12 +9,23 @@ class ARViewController: UIViewController, ARSessionDelegate {
     var currentAverageLabel: UILabel!
     var previousAverageLabel: UILabel!
     var differenceLabel: UILabel!
+    var speedLabel: UILabel!
+    var timeToImpactLabel: UILabel!
     var isARSessionRunning: Bool = false
     var gridOverlayView: UIView!
+    var thresholdSlider: UISlider!
+    var thresholdLabel: UILabel!
+    var distanceThreshold: Float = -2.2
+    var speedThreshold: Float = -2
+    var distanceThresholdLabel: UILabel!
+    var distanceSlider: UISlider!
+    var speedThresholdLabel: UILabel!
+    var speedSlider: UISlider!
     
     var middleSums: [Float32] = []
     var frameCounter: Int = 0
     var threatDistances: [Float32] = []
+    var audioPlayer: AVAudioPlayer?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -32,7 +43,71 @@ class ARViewController: UIViewController, ARSessionDelegate {
         
         setupUI()
         setupGridOverlay()
+        setupDistanceSlider()
+        setupSpeedSlider()
+        loadSound()
+    }
+    
+    func loadSound() {
+            guard let soundURL = Bundle.main.url(forResource: "alert", withExtension: "mp3") else {
+                print("Sound file not found")
+                return
             }
+            
+            do {
+                audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
+                audioPlayer?.prepareToPlay()
+            } catch {
+                print("Failed to load sound: \(error)")
+            }
+        }
+        
+        func playAlertSound() {
+            audioPlayer?.play()
+        }
+    
+    
+    
+    func setupDistanceSlider() {
+            thresholdLabel = UILabel(frame: CGRect(x: 20, y: 280, width: view.frame.width - 40, height: 40))
+            thresholdLabel.textAlignment = .center
+            thresholdLabel.textColor = .white
+            thresholdLabel.text = "Distance Threshold: \(distanceThreshold)"
+            view.addSubview(thresholdLabel)
+            
+            thresholdSlider = UISlider(frame: CGRect(x: 20, y: 320, width: view.frame.width - 40, height: 40))
+            thresholdSlider.minimumValue = -5
+            thresholdSlider.maximumValue = 0
+            thresholdSlider.value = distanceThreshold
+            thresholdSlider.addTarget(self, action: #selector(distanceSliderChanged), for: .valueChanged)
+            view.addSubview(thresholdSlider)
+        }
+        
+        @objc func distanceSliderChanged(sender: UISlider) {
+            distanceThreshold = sender.value
+            thresholdLabel.text = String(format: "Difference Threshold: %.2f", distanceThreshold)
+        }
+    
+    func setupSpeedSlider() {
+            thresholdLabel = UILabel(frame: CGRect(x: 20, y: 380, width: view.frame.width - 40, height: 40))
+            thresholdLabel.textAlignment = .center
+            thresholdLabel.textColor = .white
+            thresholdLabel.text = "Difference Threshold: \(speedThreshold)"
+            view.addSubview(thresholdLabel)
+            
+            thresholdSlider = UISlider(frame: CGRect(x: 20, y: 420, width: view.frame.width - 40, height: 40))
+            thresholdSlider.minimumValue = -5
+            thresholdSlider.maximumValue = 0
+            thresholdSlider.value = speedThreshold
+            thresholdSlider.addTarget(self, action: #selector(speedSliderChanged), for: .valueChanged)
+            view.addSubview(thresholdSlider)
+        }
+        
+        @objc func speedSliderChanged(sender: UISlider) {
+            speedThreshold = sender.value
+            thresholdLabel.text = String(format: "Speed Threshold: %.2f", speedThreshold)
+        }
+
     
     func setupUI() {
         startStopButton = UIButton(type: .system)
@@ -51,26 +126,37 @@ class ARViewController: UIViewController, ARSessionDelegate {
         statusLabel.text = "AR Session Paused"
         view.addSubview(statusLabel)
         
-        // Set up the current average label
         currentAverageLabel = UILabel(frame: CGRect(x: 20, y: 80, width: view.frame.width - 40, height: 40))
         currentAverageLabel.textAlignment = .center
         currentAverageLabel.textColor = .white
         currentAverageLabel.text = "Current Average: N/A"
         view.addSubview(currentAverageLabel)
         
-        // Set up the previous average label
         previousAverageLabel = UILabel(frame: CGRect(x: 20, y: 120, width: view.frame.width - 40, height: 40))
         previousAverageLabel.textAlignment = .center
         previousAverageLabel.textColor = .white
         previousAverageLabel.text = "Previous Average: N/A"
         view.addSubview(previousAverageLabel)
         
-        // Set up the difference label
         differenceLabel = UILabel(frame: CGRect(x: 20, y: 160, width: view.frame.width - 40, height: 40))
         differenceLabel.textAlignment = .center
         differenceLabel.textColor = .white
         differenceLabel.text = "Difference: N/A"
         view.addSubview(differenceLabel)
+        
+        // Set up the speed label
+        speedLabel = UILabel(frame: CGRect(x: 20, y: 200, width: view.frame.width - 40, height: 40))
+        speedLabel.textAlignment = .center
+        speedLabel.textColor = .white
+        speedLabel.text = "Speed: N/A"
+        view.addSubview(speedLabel)
+        
+        // Set up the time-to-impact label
+        timeToImpactLabel = UILabel(frame: CGRect(x: 20, y: 240, width: view.frame.width - 40, height: 40))
+        timeToImpactLabel.textAlignment = .center
+        timeToImpactLabel.textColor = .white
+        timeToImpactLabel.text = "Time to Impact: N/A"
+        view.addSubview(timeToImpactLabel)
     }
     
     func setupGridOverlay() {
@@ -112,7 +198,6 @@ class ARViewController: UIViewController, ARSessionDelegate {
         sceneView.session.run(configuration)
     }
     
-    // ARSessionDelegate method to handle new AR frames
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         frameCounter += 1
         
@@ -121,29 +206,27 @@ class ARViewController: UIViewController, ARSessionDelegate {
             processMiddleDepthData(depthData)
         }
     }
+
     
     func processMiddleDepthData(_ depthData: CVPixelBuffer) {
         CVPixelBufferLockBaseAddress(depthData, .readOnly)
-        
+
         let width = CVPixelBufferGetWidth(depthData)
         let height = CVPixelBufferGetHeight(depthData)
-        
-        // Get the base address of the depth data
+
         guard let baseAddress = CVPixelBufferGetBaseAddress(depthData) else {
             return
         }
-        
+
         let floatBuffer = unsafeBitCast(baseAddress, to: UnsafeMutablePointer<Float32>.self)
-        
-        // Calculate bounds for the middle part (assuming a 3x3 grid)
+
         let startX = width / 3
         let endX = 2 * (width / 3)
         let startY = height / 3
         let endY = 2 * (height / 3)
-        
+
         var depthValues: [Float32] = []
-        
-        // Iterate through the depth data to extract the middle part
+
         for y in startY..<endY {
             for x in startX..<endX {
                 let depth = floatBuffer[y * width + x]
@@ -152,39 +235,56 @@ class ARViewController: UIViewController, ARSessionDelegate {
         }
 
         CVPixelBufferUnlockBaseAddress(depthData, .readOnly)
-        
-        // Calculate the lowest quartile (25th percentile) value
+
         depthValues.sort()
         let quartileIndex = depthValues.count / 4
         let d = depthValues[quartileIndex]
-        
-        // Calculate the threshold distance
+
         let threshold = d + min(0.5, 0.1 * d)
-        
-        // Find all points within the threshold distance
+
         let closePoints = depthValues.filter { $0 <= threshold }
-        
-        // Calculate the average of the close points
         let threatDistance = closePoints.reduce(0, +) / Float32(closePoints.count)
-        
-        // Add the threat distance to the array and calculate the difference
+        var previousThreatDistance: Float32? = nil
+
         if threatDistances.count >= 10 {
-            let previousThreatDistance = threatDistances.removeFirst()
-            let difference = threatDistance - previousThreatDistance
-            differenceLabel.text = "Difference: \(difference)"
-            
-            // Change the color of the difference label based on the threshold
-            if difference < -1.5 {
+            previousThreatDistance = threatDistances.removeFirst()
+            let difference = threatDistance - previousThreatDistance!
+
+            differenceLabel.text = String(format: "Difference: %.2f", difference)
+
+            if difference < distanceThreshold {
                 differenceLabel.textColor = .red
+                playAlertSound()
             } else {
                 differenceLabel.textColor = .white
             }
+
+            // Calculate Speed
+            let timeInterval: Float = 10.0 / 20.0 // Assuming ARKit runs at 20 FPS
+            let speed = difference / timeInterval
+            speedLabel.text = String(format: "Speed: %.2f m/s", speed)
+
+            // Calculate Time to Impact
+            let timeToImpact = threatDistance / abs(speed)
+            timeToImpactLabel.text = String(format: "Time to Impact: %.2f s", timeToImpact)
+            
+            if timeToImpact < (distanceThreshold/speedThreshold) { // Comes from the slider
+                timeToImpactLabel.textColor = .red
+                playAlertSound()
+            } else {
+                timeToImpactLabel.textColor = .white
+            }
         }
-        
+
         threatDistances.append(threatDistance)
         
-        // Update the UI labels
-        previousAverageLabel.text = "Previous Average: \(threatDistances.count > 1 ? threatDistances[threatDistances.count - 2] : threatDistance)"
-        currentAverageLabel.text = "Current Average: \(threatDistance)"
+        // among 10 frame -> 9th
+        if let prev = previousThreatDistance {
+            previousAverageLabel.text = String(format: "Previous Average: %.2f", prev)
+        } else {
+            previousAverageLabel.text = "Previous Average: N/A"
+        }
+        // 10th
+        currentAverageLabel.text = String(format: "Current Average: %.2f", threatDistance)
     }
 }
