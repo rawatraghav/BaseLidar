@@ -13,14 +13,15 @@ class ARViewController: UIViewController, ARSessionDelegate {
     var timeToImpactLabel: UILabel!
     var isARSessionRunning: Bool = false
     var gridOverlayView: UIView!
-    var thresholdSlider: UISlider!
-    var thresholdLabel: UILabel!
-    var distanceThreshold: Float = -2.2
-    var speedThreshold: Float = -2
+    var ttiSlider: UISlider!
+    var ttilabel: UILabel!
+    var ttiThreshold: Float = 3
+    var speedThreshold: Float = -2.2
     var distanceThresholdLabel: UILabel!
     var distanceSlider: UISlider!
     var speedThresholdLabel: UILabel!
     var speedSlider: UISlider!
+    var slabel: UILabel!
     
     var middleSums: [Float32] = []
     var frameCounter: Int = 0
@@ -43,7 +44,7 @@ class ARViewController: UIViewController, ARSessionDelegate {
         
         setupUI()
         setupGridOverlay()
-        setupDistanceSlider()
+        setupTTISlider()
         setupSpeedSlider()
         loadSound()
     }
@@ -65,48 +66,47 @@ class ARViewController: UIViewController, ARSessionDelegate {
         func playAlertSound() {
             audioPlayer?.play()
         }
-    
-    
-    
-    func setupDistanceSlider() {
-            thresholdLabel = UILabel(frame: CGRect(x: 20, y: 280, width: view.frame.width - 40, height: 40))
-            thresholdLabel.textAlignment = .center
-            thresholdLabel.textColor = .white
-            thresholdLabel.text = "Distance Threshold: \(distanceThreshold)"
-            view.addSubview(thresholdLabel)
-            
-            thresholdSlider = UISlider(frame: CGRect(x: 20, y: 320, width: view.frame.width - 40, height: 40))
-            thresholdSlider.minimumValue = -5
-            thresholdSlider.maximumValue = 0
-            thresholdSlider.value = distanceThreshold
-            thresholdSlider.addTarget(self, action: #selector(distanceSliderChanged), for: .valueChanged)
-            view.addSubview(thresholdSlider)
-        }
-        
-        @objc func distanceSliderChanged(sender: UISlider) {
-            distanceThreshold = sender.value
-            thresholdLabel.text = String(format: "Difference Threshold: %.2f", distanceThreshold)
-        }
-    
+
+    // Setup for Speed
     func setupSpeedSlider() {
-            thresholdLabel = UILabel(frame: CGRect(x: 20, y: 380, width: view.frame.width - 40, height: 40))
-            thresholdLabel.textAlignment = .center
-            thresholdLabel.textColor = .white
-            thresholdLabel.text = "Difference Threshold: \(speedThreshold)"
-            view.addSubview(thresholdLabel)
-            
-            thresholdSlider = UISlider(frame: CGRect(x: 20, y: 420, width: view.frame.width - 40, height: 40))
-            thresholdSlider.minimumValue = -5
-            thresholdSlider.maximumValue = 0
-            thresholdSlider.value = speedThreshold
-            thresholdSlider.addTarget(self, action: #selector(speedSliderChanged), for: .valueChanged)
-            view.addSubview(thresholdSlider)
-        }
+        slabel = UILabel(frame: CGRect(x: 20, y: 280, width: view.frame.width - 40, height: 40))
+        slabel.textAlignment = .center
+        slabel.textColor = .blue
+        slabel.text = "Speed Threshold: \(speedThreshold) m/s"
+        view.addSubview(slabel)
         
-        @objc func speedSliderChanged(sender: UISlider) {
-            speedThreshold = sender.value
-            thresholdLabel.text = String(format: "Speed Threshold: %.2f", speedThreshold)
-        }
+        speedSlider = UISlider(frame: CGRect(x: 20, y: 320, width: view.frame.width - 40, height: 40))
+        speedSlider.minimumValue = -5
+        speedSlider.maximumValue = 0
+        speedSlider.value = speedThreshold
+        speedSlider.addTarget(self, action: #selector(speedSliderChanged), for: .valueChanged)
+        view.addSubview(speedSlider)
+    }
+
+    @objc func speedSliderChanged(sender: UISlider) {
+        speedThreshold = sender.value
+        slabel.text = String(format: "Speed Threshold: %.2f m/s", speedThreshold)
+    }
+    
+    func setupTTISlider() {
+        ttilabel = UILabel(frame: CGRect(x: 20, y: 380, width: view.frame.width - 40, height: 40))
+        ttilabel.textAlignment = .center
+        ttilabel.textColor = .blue
+        ttilabel.text = "TTI Threshold: \(ttiThreshold) s"
+        view.addSubview(ttilabel)
+        
+        ttiSlider = UISlider(frame: CGRect(x: 20, y: 420, width: view.frame.width - 40, height: 40))
+        ttiSlider.minimumValue = 0
+        ttiSlider.maximumValue = 6
+        ttiSlider.value = ttiThreshold
+        ttiSlider.addTarget(self, action: #selector(ttiSliderChanged), for: .valueChanged)
+        view.addSubview(ttiSlider)
+    }
+
+    @objc func ttiSliderChanged(sender: UISlider) {
+        ttiThreshold = sender.value
+        ttilabel.text = String(format: "TTI Threshold: %.2f", ttiThreshold)
+    }
 
     
     func setupUI() {
@@ -128,33 +128,33 @@ class ARViewController: UIViewController, ARSessionDelegate {
         
         currentAverageLabel = UILabel(frame: CGRect(x: 20, y: 80, width: view.frame.width - 40, height: 40))
         currentAverageLabel.textAlignment = .center
-        currentAverageLabel.textColor = .white
+        currentAverageLabel.textColor = .blue
         currentAverageLabel.text = "Current Average: N/A"
         view.addSubview(currentAverageLabel)
         
         previousAverageLabel = UILabel(frame: CGRect(x: 20, y: 120, width: view.frame.width - 40, height: 40))
         previousAverageLabel.textAlignment = .center
-        previousAverageLabel.textColor = .white
+        previousAverageLabel.textColor = .blue
         previousAverageLabel.text = "Previous Average: N/A"
         view.addSubview(previousAverageLabel)
         
         differenceLabel = UILabel(frame: CGRect(x: 20, y: 160, width: view.frame.width - 40, height: 40))
         differenceLabel.textAlignment = .center
-        differenceLabel.textColor = .white
+        differenceLabel.textColor = .blue
         differenceLabel.text = "Difference: N/A"
         view.addSubview(differenceLabel)
         
         // Set up the speed label
         speedLabel = UILabel(frame: CGRect(x: 20, y: 200, width: view.frame.width - 40, height: 40))
         speedLabel.textAlignment = .center
-        speedLabel.textColor = .white
+        speedLabel.textColor = .blue
         speedLabel.text = "Speed: N/A"
         view.addSubview(speedLabel)
         
         // Set up the time-to-impact label
         timeToImpactLabel = UILabel(frame: CGRect(x: 20, y: 240, width: view.frame.width - 40, height: 40))
         timeToImpactLabel.textAlignment = .center
-        timeToImpactLabel.textColor = .white
+        timeToImpactLabel.textColor = .blue
         timeToImpactLabel.text = "Time to Impact: N/A"
         view.addSubview(timeToImpactLabel)
     }
@@ -252,12 +252,6 @@ class ARViewController: UIViewController, ARSessionDelegate {
 
             differenceLabel.text = String(format: "Difference: %.2f", difference)
 
-            if difference < distanceThreshold {
-                differenceLabel.textColor = .red
-                playAlertSound()
-            } else {
-                differenceLabel.textColor = .white
-            }
 
             // Calculate Speed
             let timeInterval: Float = 10.0 / 20.0 // Assuming ARKit runs at 20 FPS
@@ -265,15 +259,22 @@ class ARViewController: UIViewController, ARSessionDelegate {
             speedLabel.text = String(format: "Speed: %.2f m/s", speed)
 
             // Calculate Time to Impact
-            let timeToImpact = threatDistance / abs(speed)
+            let timeToImpact: Float
+            if speed > 0 {
+                timeToImpact = 9999
+            } else {
+                timeToImpact = threatDistance / abs(speed)
+            }
             timeToImpactLabel.text = String(format: "Time to Impact: %.2f s", timeToImpact)
             
-            if timeToImpact < (distanceThreshold/speedThreshold) { // Comes from the slider
+            if timeToImpact < ttiThreshold && speed < speedThreshold  {
+                differenceLabel.textColor = .red
                 timeToImpactLabel.textColor = .red
-                playAlertSound()
             } else {
-                timeToImpactLabel.textColor = .white
+                differenceLabel.textColor = .blue
+                timeToImpactLabel.textColor = .blue
             }
+            
         }
 
         threatDistances.append(threatDistance)
